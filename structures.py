@@ -16,20 +16,31 @@ class Handshaker:
 # Response from Asessto Corsa
 class HandshackerResponse:    
     def __init__(self, data: bytes):
-        self.carName = self.get_string(data, 0, 50)
-        self.driverName = self.get_string(data, 50, 100)
-        self.identifier = struct.unpack('<i', data[100:104])[0]
-        self.version = struct.unpack('<i', data[104:108])[0]
-        self.trackName = self.get_string(data, 108, 158)
-        self.trackConfig = self.get_string(data, 158, 208)
+        # Parse strings as UTF-16
+        self.carName = self.get_string(data, 0, 100) # 50 chars * 2 bytes = 100 bytes
+        self.driverName = self.get_string(data, 100, 200) # Next 100 bytes
+        self.identifier = struct.unpack('<i', data[200:204])[0]
+        self.version = struct.unpack('<i', data[204:208])[0]
+        self.trackName = self.get_string(data, 208, 308) # Next 100 bytes
+        self.trackConfig = self.get_string(data, 308, 408) # Last 100 bytes
 
-    # Get text from bytes    
+    # Get UTF-16 string from bytes
     def get_string(self, data: bytes, start: int, end: int) -> str:
-        return data[start:end].decode('utf-8', errors='ignore').split('\x00')[0].strip()
+        chunk = data[start:end]
+        # Find null terminator \x00\x00
+        for i in range(0, len(chunk), 2):
+            if chunk[i:i+2] == b'\x00\x00':
+                chunk = chunk[:i]
+                break
+
+        # Decode and clean up
+        result = chunk.decode('utf-16-le', errors='ignore').strip()
+        result = result.rstrip('%')
+        return result
     
     # Check if connected
     def is_valid(self) -> bool:
-        return len(self.carName) > 0
+        return len(self.carName) > 0 and self.carName != ''
 
 #Main telemetry data
 class RTCarInfo:
