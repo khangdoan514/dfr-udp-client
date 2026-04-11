@@ -1,7 +1,7 @@
 import socket
 import threading
 from constants import *
-from structures import Handshaker, HandshackerResponse, RTCarInfo, RTLap
+from structures import *
 
 class ACTelemetryClient:
     def __init__(self, ac_server_ip, port=AC_PORT):
@@ -36,7 +36,7 @@ class ACTelemetryClient:
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
                 self.socket.settimeout(SOCKET_TIMEOUT)
-                print("Socket created successfully")
+                print("UDP Socket created successfully")
             
             # Send handshake
             print("Sending handshake...")
@@ -128,7 +128,7 @@ class ACTelemetryClient:
             self.receive_thread.join(timeout=2.0)
         print("Stopped receiving")
     
-    # Disconnect from AC
+    # Disconnect from Assetto Corsa
     def dismiss(self):
         print("Disconnecting...")
         self.stop_receiving()

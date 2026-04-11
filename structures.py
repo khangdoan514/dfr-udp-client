@@ -12,11 +12,10 @@ class Handshaker:
     def pack(self) -> bytes:
         return struct.pack('<iii', self.identifier, self.version, self.operationId)
 
-
 # Response from Asessto Corsa
 class HandshackerResponse:    
     def __init__(self, data: bytes):
-        # Parse strings as UTF-16
+        # UTF-16
         self.carName = self.get_string(data, 0, 100) # 50 chars * 2 bytes = 100 bytes
         self.driverName = self.get_string(data, 100, 200) # Next 100 bytes
         self.identifier = struct.unpack('<i', data[200:204])[0]
@@ -24,10 +23,10 @@ class HandshackerResponse:
         self.trackName = self.get_string(data, 208, 308) # Next 100 bytes
         self.trackConfig = self.get_string(data, 308, 408) # Last 100 bytes
 
-    # Get UTF-16 string from bytes
+    # Get string from bytes
     def get_string(self, data: bytes, start: int, end: int) -> str:
         chunk = data[start:end]
-        # Find null terminator \x00\x00
+        # Find null
         for i in range(0, len(chunk), 2):
             if chunk[i:i+2] == b'\x00\x00':
                 chunk = chunk[:i]
@@ -42,13 +41,13 @@ class HandshackerResponse:
     def is_valid(self) -> bool:
         return len(self.carName) > 0 and self.carName != ''
 
-#Main telemetry data
+# Main telemetry data
 class RTCarInfo:
     def __init__(self, data: bytes):
         self.parse(data)
     
     def parse(self, data: bytes):
-        offset = 8 # Skip identifier and size
+        offset = 8
         
         # Speeds
         self.speed_Kmh = self.get_float(data, offset); offset += 4
@@ -62,7 +61,7 @@ class RTCarInfo:
         self.isTcEnabled = bool(data[offset]); offset += 1
         self.isInPit = bool(data[offset]); offset += 1
         self.isEngineLimiterOn = bool(data[offset]); offset += 1
-        offset += 2 # Padding
+        offset += 2
         
         # G-Forces
         self.accG_vertical = self.get_float(data, offset); offset += 4
@@ -84,7 +83,7 @@ class RTCarInfo:
         self.gear = self.get_int(data, offset); offset += 4
         self.cgHeight = self.get_float(data, offset); offset += 4
         
-        # Wheel data (4 values each)
+        # Wheel data
         self.wheelAngularSpeed = self.get_floats(data, offset, 4); offset += 16
         self.slipAngle = self.get_floats(data, offset, 4); offset += 16
         self.slipAngle_ContactPatch = self.get_floats(data, offset, 4); offset += 16
