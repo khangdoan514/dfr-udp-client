@@ -1,9 +1,10 @@
 from client import ACTelemetryClient
 from constants import SUBSCRIBE_UPDATE
 import time
-
+import traceback
 
 def main():
+    # Asessto Corsa client
     client = ACTelemetryClient("127.0.0.1")
     
     try:
@@ -30,7 +31,7 @@ def main():
         
         client.add_callback('telemetry', on_telemetry)
         
-        print("\n[3] Receiving telemetry... Press Ctrl + C to stop\n")
+        print("\n[3] Receiving data...")
         client.start_receiving()
         
         # Keep running
@@ -42,11 +43,9 @@ def main():
         
     except Exception as e:
         print(f"\nERROR: {e}")
-        import traceback
         traceback.print_exc()
         
     finally:
-        print("\n[4] Disconnecting...")
         client.dismiss()
 
 if __name__ == "__main__":
