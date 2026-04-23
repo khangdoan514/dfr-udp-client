@@ -32,20 +32,16 @@ class ACTelemetryClient:
         try:
             # Create socket if it doesn't exist
             if self.socket is None:
-                print("Creating UDP socket...")
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
                 self.socket.settimeout(SOCKET_TIMEOUT)
                 print("UDP Socket created successfully")
             
             # Send handshake
-            print("Sending handshake...")
             handshake = Handshaker(operationId=HANDSHAKE)
             self.socket.sendto(handshake.pack(), (self.ac_server_ip, self.ac_port))
-            print("Handshake sent")
             
             # Receive response
-            print("Waiting for response...")
             data, addr = self.socket.recvfrom(BUFFER_SIZE)
             print(f"Received {len(data)} bytes")
             
@@ -126,7 +122,7 @@ class ACTelemetryClient:
         self.running = False
         if self.receive_thread and self.receive_thread.is_alive():
             self.receive_thread.join(timeout=2.0)
-        print("Stopped receiving")
+        print("Stopped receiving data")
     
     # Disconnect from Assetto Corsa
     def dismiss(self):
