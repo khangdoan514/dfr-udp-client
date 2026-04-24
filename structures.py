@@ -47,6 +47,8 @@ class RTCarInfo:
         self.parse(data)
     
     def parse(self, data: bytes):
+        self.identifier = data[0]
+        self.size = self.get_int(data, 4)
         offset = 8
         
         # Speeds

@@ -17,6 +17,24 @@ SENSOR_ID = 'ac-telemetry-1'
 SENSOR_NAME = 'Assetto Corsa'
 STREAM_NAME = 'ac-telemetry'
 
+# RTCarInfo float[4]
+WHEEL = (
+    'wheelAngularSpeed',
+    'slipAngle',
+    'slipAngle_ContactPatch',
+    'slipRatio',
+    'tyreSlip',
+    'ndSlip',
+    'load',
+    'Dy',
+    'Mz',
+    'tyreDirtyLevel',
+    'camberRAD',
+    'tyreRadius',
+    'tyreLoadedRadius',
+    'suspensionHeight',
+)
+
 def build_kafka_message(body: dict) -> dict:
     return {
         'payload': {
@@ -26,13 +44,68 @@ def build_kafka_message(body: dict) -> dict:
         }
     }
 
+def base_message() -> dict:
+    return {
+        'timestamp': time.time(),
+        'source': 'Assetto Corsa',
+        'sensor_id': SENSOR_ID,
+        'sensor_name': SENSOR_NAME,
+        'event_type': 'telemetry',
+    }
+
+def send(send_to_kafka, base: dict, channel: str, value):
+    body = {**base, 'channel': channel, 'value': value}
+    send_to_kafka(build_kafka_message(body))
+
+def send_telemetry(send_to_kafka, telemetry):
+    base = base_message()
+    channels = (
+        ('identifier', telemetry.identifier),
+        ('size', telemetry.size),
+        ('speed_Kmh', telemetry.speed_Kmh),
+        ('speed_Mph', telemetry.speed_Mph),
+        ('speed_Ms', telemetry.speed_Ms),
+        ('isAbsEnabled', telemetry.isAbsEnabled),
+        ('isAbsInAction', telemetry.isAbsInAction),
+        ('isTcInAction', telemetry.isTcInAction),
+        ('isTcEnabled', telemetry.isTcEnabled),
+        ('isInPit', telemetry.isInPit),
+        ('isEngineLimiterOn', telemetry.isEngineLimiterOn),
+        ('accG_vertical', telemetry.accG_vertical),
+        ('accG_horizontal', telemetry.accG_horizontal),
+        ('accG_frontal', telemetry.accG_frontal),
+        ('lapTime', telemetry.lapTime),
+        ('lastLap', telemetry.lastLap),
+        ('bestLap', telemetry.bestLap),
+        ('lapCount', telemetry.lapCount),
+        ('gas', telemetry.gas),
+        ('brake', telemetry.brake),
+        ('clutch', telemetry.clutch),
+        ('engineRPM', telemetry.engineRPM),
+        ('steer', telemetry.steer),
+        ('gear', telemetry.gear),
+        ('cgHeight', telemetry.cgHeight),
+        ('carPositionNormalized', telemetry.carPositionNormalized),
+        ('carSlope', telemetry.carSlope),
+    )
+
+    for channel, value in channels:
+        send(send_to_kafka, base, channel, value)
+
+    for i, value in enumerate(telemetry.carCoordinates):
+        send(send_to_kafka, base, f'carCoordinates_{i}', value)
+
+    for attr in WHEEL:
+        values = getattr(telemetry, attr)
+        for i, value in enumerate(values):
+            send(send_to_kafka, base, f'{attr}_{i}', value)
+
 def main():
     # Kafka producer
     kafka_producer = Producer(KAFKA_CONFIG)
     
     # Asessto Corsa client
     client = ACTelemetryClient("127.0.0.1")
-    
     def send_to_kafka(message: dict):
         try:
             data_json = json.dumps(message)
@@ -43,44 +116,7 @@ def main():
             kafka_producer.poll(0)
         except Exception as e:
             print(f"Error sending to Kafka: {e}")
-    
-    def telemetry_channels(telemetry):
-        return {
-            'event_type': 'telemetry',
-            'speed_Kmh': telemetry.speed_Kmh,
-            'speed_Mph': telemetry.speed_Mph,
-            'speed_Ms': telemetry.speed_Ms,
-            'isAbsEnabled': telemetry.isAbsEnabled,
-            'isAbsInAction': telemetry.isAbsInAction,
-            'isTcInAction': telemetry.isTcInAction,
-            'isTcEnabled': telemetry.isTcEnabled,
-            'isInPit': telemetry.isInPit,
-            'isEngineLimiterOn': telemetry.isEngineLimiterOn,
-            'accG_vertical': telemetry.accG_vertical,
-            'accG_horizontal': telemetry.accG_horizontal,
-            'accG_frontal': telemetry.accG_frontal,
-            'lapTime': telemetry.lapTime,
-            'lastLap': telemetry.lastLap,
-            'bestLap': telemetry.bestLap,
-            'lapCount': telemetry.lapCount,
-            'gas': telemetry.gas,
-            'brake': telemetry.brake,
-            'clutch': telemetry.clutch,
-            'engineRPM': telemetry.engineRPM,
-            'steer': telemetry.steer,
-            'gear': telemetry.gear,
-            'gear_display': telemetry.gear_text(),
-            'cgHeight': telemetry.cgHeight,
-            'wheelAngularSpeed': telemetry.wheelAngularSpeed,
-            'slipAngle': telemetry.slipAngle,
-            'slipRatio': telemetry.slipRatio,
-            'load': telemetry.load,
-            'suspensionHeight': telemetry.suspensionHeight,
-            'carPositionNormalized': telemetry.carPositionNormalized,
-            'carSlope': telemetry.carSlope,
-            'carCoordinates': telemetry.carCoordinates
-        }
-    
+
     try:
         print(f"Connecting to Assetto Corsa...")
         response = client.connect()
@@ -101,25 +137,20 @@ def main():
             'sensor_id': SENSOR_ID,
             'sensor_name': SENSOR_NAME,
             'event_type': 'session_start',
-            'car': response.carName,
-            'driver': response.driverName,
-            'track': response.trackName,
+            'identifier': response.identifier,
+            'version': response.version,
+            'carName': response.carName,
+            'driverName': response.driverName,
+            'trackName': response.trackName,
+            'trackConfig': response.trackConfig,
         }
         send_to_kafka(build_kafka_message(session_body))
         
         # Show data
         def on_telemetry(telemetry):
             gear = telemetry.gear_text()
-            
-            # Send to Kafka: one message per AC sample, many channels in body
-            body = {
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'sensor_id': SENSOR_ID,
-                'sensor_name': SENSOR_NAME,
-                **telemetry_channels(telemetry),
-            }
-            send_to_kafka(build_kafka_message(body))
-            
+            send_telemetry(send_to_kafka, telemetry)
+
             # Print
             print(f"\rSpeed: {telemetry.speed_Kmh:6.1f} km/h | "
                   f"RPM: {telemetry.engineRPM:6.0f} | "
